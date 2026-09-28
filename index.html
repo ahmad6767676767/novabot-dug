@@ -1,0 +1,92 @@
+-- Place this Script inside ServerScriptService in Roblox Studio
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+-- Configuration
+local GROW_TIME = 5       -- Time in seconds for a crop to grow
+local SEED_COST = 10      -- Cost to plant if out of inventory seeds
+local HARVEST_REWARD = 25 -- Coins rewarded when harvesting
+
+-- 1. Leaderstats Setup (Coins & Seeds)
+Players.PlayerAdded:Connect(function(player)
+	local leaderstats = Instance.new("Folder")
+	leaderstats.Name = "leaderstats"
+	leaderstats.Parent = player
+
+	local coins = Instance.new("IntValue")
+	coins.Name = "Coins"
+	coins.Value = 50
+	coins.Parent = leaderstats
+
+	local seeds = Instance.new("IntValue")
+	seeds.Name = "Seeds"
+	seeds.Value = 5
+	seeds.Parent = leaderstats
+end)
+
+-- 2. Garden Plot Logic
+local function setupPlot(plot)
+	local state = "Empty" -- "Empty", "Growing", "Grown"
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ObjectText = "Garden Plot"
+	prompt.ActionText = "Plant Seed"
+	prompt.HoldDuration = 0.5
+	prompt.Parent = plot
+
+	prompt.Triggered:Connect(function(player)
+		local leaderstats = player:FindFirstChild("leaderstats")
+		if not leaderstats then return end
+
+		local seeds = leaderstats:FindFirstChild("Seeds")
+		local coins = leaderstats:FindFirstChild("Coins")
+
+		-- PLANTING PHASE
+		if state == "Empty" then
+			local canPlant = false
+
+			if seeds and seeds.Value > 0 then
+				seeds.Value -= 1
+				canPlant = true
+			elseif coins and coins.Value >= SEED_COST then
+				coins.Value -= SEED_COST
+				canPlant = true
+			end
+
+			if canPlant then
+				state = "Growing"
+				prompt.ActionText = "Growing..."
+				prompt.Enabled = false
+				plot.Color = Color3.fromRGB(139, 69, 19) -- Dirt color
+
+				task.wait(GROW_TIME)
+
+				state = "Grown"
+				plot.Color = Color3.fromRGB(50, 205, 50) -- Ready green color
+				prompt.ActionText = "Harvest Crop"
+				prompt.Enabled = true
+			end
+
+		-- HARVESTING PHASE
+		elseif state == "Grown" then
+			state = "Empty"
+			if coins then
+				coins.Value += HARVEST_REWARD
+			end
+
+			plot.Color = Color3.fromRGB(163, 162, 165) -- Reset plot color
+			prompt.ActionText = "Plant Seed"
+		end
+	end)
+end
+
+-- 3. Initialize Plots
+local plotsFolder = Workspace:WaitForChild("Plots", 5)
+if plotsFolder then
+	for _, plot in ipairs(plotsFolder:GetChildren()) do
+		if plot:IsA("BasePart") then
+			setupPlot(plot)
+		end
+	end
+end
